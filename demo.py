@@ -19,6 +19,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import datetime
+import os
 import sys
 from absl import flags
 import numpy as np
@@ -36,9 +38,13 @@ flags.DEFINE_string('img_path', 'data/im1963.jpg', 'Image to run')
 flags.DEFINE_string(
     'json_path', None,
     'If specified, uses the openpose output to crop the image.')
+flags.DEFINE_string(
+    'output_path',
+    'output/swim_yoko_{}.png'.format(datetime.datetime.now().strftime('%Y%m%d')),
+    'Output path')
 
 
-def visualize(img, proc_param, joints, verts, cam):
+def visualize(img, proc_param, joints, verts, cam, output_path):
     """
     Renders the result in original image coordinate frame.
     """
@@ -55,6 +61,9 @@ def visualize(img, proc_param, joints, verts, cam):
         vert_shifted, 60, cam=cam_for_render, img_size=img.shape[:2])
     rend_img_vp2 = renderer.rotated(
         vert_shifted, -60, cam=cam_for_render, img_size=img.shape[:2])
+
+    import matplotlib
+    matplotlib.use('Agg')
 
     import matplotlib.pyplot as plt
     # plt.ion()
@@ -85,7 +94,8 @@ def visualize(img, proc_param, joints, verts, cam):
     plt.title('diff vp')
     plt.axis('off')
     plt.draw()
-    plt.show()
+    # plt.show()
+    plt.savefig(output_path)
     # import ipdb
     # ipdb.set_trace()
 
@@ -116,7 +126,29 @@ def preprocess_image(img_path, json_path=None):
     return crop, proc_param, img
 
 
-def main(img_path, json_path=None):
+def save_as_json(input_obj, output_path):
+    import json
+
+    with open(output_path, 'w') as f:
+        json.dump(input_obj, f)
+
+
+def save_json(joints, verts, cams, joints3d, theta):
+    input_objs = [joints, verts, cams, joints3d, theta]
+    file_names = ['joints.json', 'verts.json', 'cams.json', 'joints3d.json', 'theta.json']
+
+    for input_obj, file_name in zip(input_objs, file_names):
+
+        OUTPUT_JSON_PATH = os.getenv('OUTPUT_JSON_PATH', './output')
+        output_path = os.path.join(OUTPUT_JSON_PATH, file_name)
+
+        print(input_obj)
+
+        save_as_json(input_obj, output_path)
+
+
+
+def main(img_path, output_path, json_path=None):
     sess = tf.Session()
     model = RunModel(config, sess=sess)
 
@@ -131,7 +163,18 @@ def main(img_path, json_path=None):
     joints, verts, cams, joints3d, theta = model.predict(
         input_img, get_theta=True)
 
-    visualize(img, proc_param, joints[0], verts[0], cams[0])
+    # from IPython import embed
+    # embed()
+
+    with_json = os.getenv('WITH_JSON', False)
+    if with_json:
+        save_json(joints[0].tolist(),
+                  verts[0].tolist(),
+                  cams[0].tolist(),
+                  joints3d[0].tolist(),
+                  theta[0].tolist())
+
+    visualize(img, proc_param, joints[0], verts[0], cams[0], output_path)
 
 
 if __name__ == '__main__':
@@ -144,4 +187,4 @@ if __name__ == '__main__':
 
     renderer = vis_util.SMPLRenderer(face_path=config.smpl_face_path)
 
-    main(config.img_path, config.json_path)
+    main(config.img_path, config.output_path, config.json_path)
