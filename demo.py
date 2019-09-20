@@ -40,7 +40,7 @@ flags.DEFINE_string(
     'If specified, uses the openpose output to crop the image.')
 flags.DEFINE_string(
     'output_path',
-    'output/swim_yoko_{}.png'.format(datetime.datetime.now().strftime('%Y%m%d')),
+    'output_{}.png'.format(datetime.datetime.now().strftime('%Y%m%d')),
     'Output path')
 
 
